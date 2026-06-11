@@ -6,7 +6,7 @@ let editingRecordId = null;
 let isChecking = false;
 let favoritesOnly = false;
 let originalCode = '';
-const API_URL = ''; // Пустая строка - используем относительные пути
+const API_URL = ''; // Пустая строка для относительных путей
 
 // ===================== СОХРАНЕНИЕ ТЕКУЩЕЙ СТРАНИЦЫ =====================
 function saveCurrentPage(pageId) {
@@ -22,6 +22,7 @@ function restoreLastPage() {
     }
 }
 
+// ===================== ПОЛУЧЕНИЕ ЗАГОЛОВКОВ =====================
 function getHeaders() {
     const headers = { 'Content-Type': 'application/json' };
     if (currentUser && currentUser.userId) {
@@ -30,6 +31,7 @@ function getHeaders() {
     return headers;
 }
 
+// ===================== ТИПИЧНЫЕ ОШИБКИ =====================
 const typicalErrors = [
     { id: 1, title: "NameError: имя не определено", category: "variables", badge: "Переменные",
         wrong: "age = 25\nprint(ages)",
@@ -55,15 +57,34 @@ const typicalErrors = [
         wrong: "result = 10 / 0",
         correct: "if divisor != 0: result = 10 / divisor",
         explanation: "❌ Всегда проверяйте делитель перед делением.",
-        link: "https://docs.python.org/3/library/exceptions.html" }
+        link: "https://docs.python.org/3/library/exceptions.html" },
+    { id: 6, title: "IndexError: выход за границы списка", category: "variables", badge: "Списки",
+        wrong: "my_list = [1,2,3]\nprint(my_list[5])",
+        correct: "if 5 < len(my_list): print(my_list[5])",
+        explanation: "❌ Индекс должен быть от 0 до len(список)-1.",
+        link: "https://docs.python.org/3/tutorial/datastructures.html" },
+    { id: 7, title: "KeyError: ключ отсутствует в словаре", category: "variables", badge: "Словари",
+        wrong: "my_dict = {'name':'Alice'}\nprint(my_dict['age'])",
+        correct: "print(my_dict.get('age', 'не найден'))",
+        explanation: "❌ Используйте метод get() или оператор in.",
+        link: "https://docs.python.org/3/library/stdtypes.html" },
+    { id: 8, title: "ValueError: некорректное преобразование", category: "types", badge: "Преобразование",
+        wrong: "number = int('abc')",
+        correct: "try: number = int('abc')\nexcept ValueError: print('Ошибка')",
+        explanation: "❌ Используйте try-except для обработки.",
+        link: "https://docs.python.org/3/tutorial/errors.html" }
 ];
 
+// ===================== ПОЛЕЗНЫЕ МАТЕРИАЛЫ =====================
 const learningResources = [
     { title: "📘 Официальная документация Python", description: "Полное руководство", url: "https://docs.python.org/3/tutorial/", tag: "Документация" },
     { title: "🎯 Python Tutor", description: "Визуализация выполнения кода", url: "https://pythontutor.com/", tag: "Визуализация" },
     { title: "💡 Real Python", description: "Практические уроки", url: "https://realpython.com/", tag: "Уроки" },
     { title: "🎮 Codecademy", description: "Интерактивный курс", url: "https://www.codecademy.com/learn/learn-python", tag: "Курс" },
-    { title: "📺 Лекции Тимофея Хирьянова", description: "Курс от МФТИ", url: "https://www.youtube.com/playlist?list=PLRDzFCPr95fK7tr47883DFUbm4GeOjjc0", tag: "Видеолекции" }
+    { title: "📺 Лекции Тимофея Хирьянова", description: "Курс от МФТИ", url: "https://www.youtube.com/playlist?list=PLRDzFCPr95fK7tr47883DFUbm4GeOjjc0", tag: "Видеолекции" },
+    { title: "🐍 CheckiO", description: "Игровой подход", url: "https://checkio.org/", tag: "Игры" },
+    { title: "📖 Python Handbook", description: "Краткий справочник", url: "https://pythonhandbook.com/", tag: "Справочник" },
+    { title: "🔧 W3Schools Python", description: "Упражнения", url: "https://www.w3schools.com/python/", tag: "Учебник" }
 ];
 
 // ===================== ЗАГРУЗКА ПРИ СТАРТЕ =====================
@@ -91,12 +112,25 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
+// ===================== ПЕРЕКЛЮЧЕНИЕ СТРАНИЦ (С АВТООБНОВЛЕНИЕМ) =====================
 function showPage(pageId) {
     saveCurrentPage(pageId);
     document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
     document.getElementById(pageId).classList.add('active');
-    if (pageId === 'historyPage') loadHistory();
-    if (pageId === 'reportPage') { updateStatsFromServer(); loadWeeklyStats(); }
+    
+    // Автоматическое обновление данных при переключении страниц
+    if (pageId === 'historyPage') {
+        loadHistory();
+    }
+    if (pageId === 'reportPage') { 
+        updateStatsFromServer();
+        loadWeeklyStats();
+        loadTopErrors();
+        loadDailyActivity();
+    }
+    if (pageId === 'mainPage') {
+        updateStatsFromServer();
+    }
 }
 
 // ===================== ФУНКЦИИ АККАУНТА =====================
@@ -136,6 +170,7 @@ async function login() {
             await updateStatsFromServer();
             await loadWeeklyStats();
             await loadUserSettings();
+            await refreshAllData(); // Обновляем все данные
             
             const savedPage = localStorage.getItem('currentPage');
             if (savedPage && document.getElementById(savedPage)) {
@@ -253,6 +288,7 @@ function checkSession() {
     }
 }
 
+// ===================== ФИЛЬТРЫ =====================
 function resetFilters() {
     document.getElementById('searchInput').value = '';
     document.getElementById('statusFilter').value = 'all';
@@ -276,6 +312,7 @@ function toggleFavoritesFilter() {
     loadHistory();
 }
 
+// ===================== ВАЛИДАЦИЯ КОДА =====================
 function validatePythonCode(code) {
     const errors = [];
     const lines = code.split('\n');
@@ -326,15 +363,33 @@ function getDetailedErrorExplanation(error) {
         'SyntaxError': { title: '❌ SyntaxError - Синтаксическая ошибка', desc: 'Python не может разобрать код', solution: 'Проверьте скобки, кавычки, двоеточия', beginnerTip: '💡 Часто забывают двоеточие после if, for, while, def' },
         'IndentationError': { title: '❌ IndentationError - Ошибка отступов', desc: 'Неправильные отступы в коде', solution: 'Используйте 4 пробела для отступов', beginnerTip: '💡 Не смешивайте пробелы и табуляцию' },
         'TypeError': { title: '❌ TypeError - Ошибка типа', desc: 'Несовместимые типы данных', solution: 'Используйте преобразование типов', beginnerTip: '💡 Нельзя складывать строку с числом' },
-        'ZeroDivisionError': { title: '❌ ZeroDivisionError - Деление на ноль', desc: 'Попытка деления на ноль', solution: 'Проверьте делитель перед делением', beginnerTip: '💡 Всегда проверяйте, что делитель не равен нулю' }
+        'ZeroDivisionError': { title: '❌ ZeroDivisionError - Деление на ноль', desc: 'Попытка деления на ноль', solution: 'Проверьте делитель перед делением', beginnerTip: '💡 Всегда проверяйте, что делитель не равен нулю' },
+        'IndexError': { title: '❌ IndexError - Выход за границы', desc: 'Индекс вне диапазона списка', solution: 'Проверьте длину списка', beginnerTip: '💡 Индексы начинаются с 0' },
+        'KeyError': { title: '❌ KeyError - Ключ не найден', desc: 'Ключ отсутствует в словаре', solution: 'Используйте метод get()', beginnerTip: '💡 Проверьте существование ключа' },
+        'ValueError': { title: '❌ ValueError - Неверное значение', desc: 'Некорректное преобразование типа', solution: 'Используйте try-except', beginnerTip: '💡 Проверяйте данные перед преобразованием' }
     };
     const exp = explanations[errorName];
     if (exp) {
-        return `<h4>${exp.title}</h4><p><strong>📖 Описание:</strong> ${exp.desc}</p><p><strong>🔧 Решение:</strong> ${exp.solution}</p><div style="background:rgba(255,152,0,0.2); padding:10px; border-radius:8px; margin:10px 0"><strong>🎓 Совет:</strong> ${exp.beginnerTip}</div>`;
+        return `<h4>${exp.title}</h4><p><strong>📖 Описание:</strong> ${exp.desc}</p><p><strong>🔧 Решение:</strong> ${exp.solution}</p><div style="background:rgba(255,152,0,0.2); padding:10px; border-radius:8px; margin:10px 0"><strong>🎓 Совет:</strong> ${exp.beginnerTip}</div>${getTipForError(error)}`;
     }
     return `<p>⚠️ Для этой ошибки пока нет подробного описания. Проверьте синтаксис вашего кода.</p>`;
 }
 
+function getTipForError(errorText) {
+    const errorType = extractErrorName(errorText);
+    const errorMapping = { 
+        'NameError': typicalErrors[0], 'SyntaxError': typicalErrors[1], 'IndentationError': typicalErrors[2], 
+        'TypeError': typicalErrors[3], 'ZeroDivisionError': typicalErrors[4], 'IndexError': typicalErrors[5], 
+        'KeyError': typicalErrors[6], 'ValueError': typicalErrors[7] 
+    };
+    const tip = errorMapping[errorType];
+    if (tip) {
+        return `<div style="background:rgba(255,87,34,0.15); padding:15px; border-radius:10px; margin-top:15px"><h4 style="color:#ff5722">📌 Связанная типичная ошибка:</h4><div class="tip-wrong"><strong>❌ Неправильно:</strong><br><code>${escapeHtml(tip.wrong)}</code></div><div class="tip-correct"><strong>✅ Правильно:</strong><br><code>${escapeHtml(tip.correct)}</code></div><a href="${tip.link}" target="_blank" style="color:#ff5722">📖 Подробнее →</a></div>`;
+    }
+    return '';
+}
+
+// ===================== ПРОВЕРКА КОДА (С АВТООБНОВЛЕНИЕМ) =====================
 async function checkCode() {
     const honeypot = document.getElementById('website');
     if (honeypot && honeypot.value !== '') {
@@ -402,9 +457,13 @@ async function checkCode() {
             explanationDiv.innerHTML = getDetailedErrorExplanation(data.error);
         }
         
-        await updateStatsFromServer();
+        // Сохраняем в историю
         await saveHistory(code, status, errorType);
-        await loadHistory();
+        
+        // АВТОМАТИЧЕСКОЕ ОБНОВЛЕНИЕ ВСЕХ ДАННЫХ
+        await refreshAllData();
+        
+        showNotification('✅ Проверка завершена, данные обновлены', 'success');
         
         if (localStorage.getItem('auto_save') !== 'false' && currentUser && !editingRecordId) {
             localStorage.removeItem('draft_code');
@@ -424,6 +483,25 @@ async function checkCode() {
     }
 }
 
+// ===================== ФУНКЦИЯ ДЛЯ ОБНОВЛЕНИЯ ВСЕХ ДАННЫХ =====================
+async function refreshAllData() {
+    if (!currentUser) return;
+    
+    console.log('🔄 Автоматическое обновление данных...');
+    
+    try {
+        await updateStatsFromServer();
+        await loadHistory();
+        await loadWeeklyStats();
+        await loadTopErrors();
+        await loadDailyActivity();
+        console.log('✅ Все данные обновлены');
+    } catch (error) {
+        console.error('Ошибка при обновлении данных:', error);
+    }
+}
+
+// ===================== CRUD ОПЕРАЦИИ =====================
 async function saveHistory(code, status, errorType) {
     if (!currentUser) return;
     
@@ -477,7 +555,7 @@ async function loadHistory() {
         displayPagination(totalPages);
     } catch (error) {
         console.error('Ошибка загрузки истории:', error);
-        document.getElementById('historyTableBody').innerHTML = '<td><td colspan="7">❌ Ошибка загрузки истории</td></tr>';
+        document.getElementById('historyTableBody').innerHTML = '<tr><td colspan="7">❌ Ошибка загрузки истории</td></tr>';
     }
 }
 
@@ -506,7 +584,7 @@ function displayHistory(data) {
                     <button onclick="editRecord(${item.request_id})" class="action-edit">✏️</button>
                     <button onclick="deleteRecord(${item.request_id})" class="action-delete">🗑️</button>
                 </td>
-            </table>
+            </tr>
         `;
     });
 }
@@ -618,8 +696,7 @@ async function saveEdit() {
         if (result.success) {
             showNotification('✅ Изменения сохранены', 'success');
             cancelEdit();
-            loadHistory();
-            updateStatsFromServer();
+            await refreshAllData(); // Обновляем все данные
         } else {
             showNotification(result.message || '❌ Ошибка сохранения', 'error');
         }
@@ -648,9 +725,8 @@ async function deleteRecord(id) {
         const response = await fetch(`${API_URL}/delete/${id}`, { method: 'DELETE', headers: getHeaders() });
         const result = await response.json();
         if (result.success) {
-            loadHistory();
-            updateStatsFromServer();
-            showNotification('✅ Запись удалена', 'success');
+            await refreshAllData(); // Обновляем все данные
+            showNotification('✅ Запись удалена, данные обновлены', 'success');
         } else {
             showNotification(result.message || '❌ Ошибка удаления', 'error');
         }
@@ -664,11 +740,12 @@ async function toggleFavorite(id, current) {
             headers: getHeaders(),
             body: JSON.stringify({ is_favorite: !current })
         });
-        loadHistory();
-        updateStatsFromServer();
+        await refreshAllData(); // Обновляем все данные
+        showNotification('⭐ Избранное обновлено', 'success');
     } catch (error) { console.error('Ошибка'); }
 }
 
+// ===================== СТАТИСТИКА =====================
 async function updateStatsFromServer() {
     if (!currentUser) return;
     
@@ -779,6 +856,7 @@ async function generateFullReport() {
     } catch (error) { alert('Ошибка отчёта'); }
 }
 
+// ===================== ЭКСПОРТ В PDF =====================
 async function exportHistoryToPDF() {
     if (!currentUser) {
         alert('🔐 Войдите в аккаунт');
@@ -843,6 +921,7 @@ function exportReportToPDF() {
     showNotification('📑 Отчёт экспортирован', 'success');
 }
 
+// ===================== ЗАГРУЗКА ФАЙЛА =====================
 function showFileName() {
     const file = document.getElementById('fileInput').files[0];
     const fileError = document.getElementById('fileError');
@@ -906,6 +985,7 @@ function clearCode() {
     showNotification('🗑 Редактор очищен', 'info');
 }
 
+// ===================== ТИПИЧНЫЕ ОШИБКИ =====================
 function loadTypicalErrors() { const c = document.getElementById('tipsList'); if (c) displayTips(typicalErrors); }
 function displayTips(tips) {
     const container = document.getElementById('tipsList');
@@ -929,6 +1009,7 @@ function loadLearningResources() {
     container.innerHTML = learningResources.map(r => `<a href="${r.url}" target="_blank" class="resource-item"><div class="resource-title">${r.title}</div><div class="resource-desc">${r.description}</div><span class="resource-tag">${r.tag}</span></a>`).join('');
 }
 
+// ===================== РЕГИСТРАЦИЯ =====================
 function showRegisterModal() {
     document.getElementById('registerModal').style.display = 'block';
     document.getElementById('regError').style.display = 'none';
@@ -977,6 +1058,7 @@ async function register() {
     }
 }
 
+// ===================== ТЁМНАЯ ТЕМА =====================
 function applyTheme(isDark) {
     if (isDark) {
         document.body.classList.add('dark-theme');
@@ -999,6 +1081,7 @@ function loadTheme() {
     applyTheme(savedTheme === 'dark');
 }
 
+// ===================== НАСТРОЙКИ =====================
 async function loadUserSettings() {
     if (!currentUser) { loadTheme(); return; }
     try {
@@ -1059,6 +1142,18 @@ async function saveSettings() {
     }
 }
 
+// ===================== АВТОМАТИЧЕСКОЕ ОБНОВЛЕНИЕ КАЖДЫЕ 30 СЕКУНД =====================
+setInterval(() => {
+    if (currentUser) {
+        const activePage = document.querySelector('.page.active')?.id;
+        if (activePage === 'historyPage' || activePage === 'reportPage') {
+            refreshAllData();
+            console.log('🔄 Автообновление по таймеру');
+        }
+    }
+}, 30000); // 30 секунд
+
+// ===================== ВСПОМОГАТЕЛЬНЫЕ =====================
 function escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
 function closeModal() { document.getElementById('detailModal').style.display = 'none'; }
 function showNotification(msg, type) {
@@ -1077,5 +1172,6 @@ window.onclick = function(e) {
     if (e.target === rm) rm.style.display = 'none';
 }
 
+// Инициализация
 loadTheme();
 restoreLastPage();
