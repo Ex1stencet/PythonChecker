@@ -13,8 +13,8 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.static('.'));
 
-// База данных в /tmp для Render.com
-const dbPath = '/tmp/codechecker.db';
+// База данных
+const dbPath = process.env.DB_PATH || 'codechecker.db';
 const db = new sqlite3.Database(dbPath, (err) => {
     if (err) console.log("❌ Ошибка БД:", err.message);
     else { console.log("✅ База данных подключена"); initDatabase(); }
